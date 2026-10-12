@@ -1,14 +1,26 @@
 {
   "version": 2,
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.js"
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "certs/**",
+          "*.html",
+          "*.css",
+          "assets/**",
+          "*.png",
+          "*.ico",
+          "*.webp"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.js"
     }
   ]
 }
