@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     const app = await getApp();
     return app(req, res);
   } catch (error) {
-    console.error('No se pudo iniciar la aplicación:', error.code || error.name);
+    console.error('No se pudo iniciar la aplicación:', {code: error.code || error.name, missingFile: error.code === 'ENOENT' ? error.path : undefined});
     if (!res.headersSent) {
       return res.status(503).json({ error: 'Servicio temporalmente no disponible.' });
     }
