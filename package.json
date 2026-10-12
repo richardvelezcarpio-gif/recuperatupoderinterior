@@ -1,0 +1,25 @@
+{
+  "name": "recupera-tu-poder-interior",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --watch-path=server.js --watch-path=app.js --watch-path=database.js --watch-path=config.js --watch-path=program.js --watch-path=.env server.js",
+    "start": "node server.js",
+    "admin:set": "node scripts/set-admin.js",
+    "test": "node --test tests/*.test.js",
+    "email:verify": "node scripts/verify-email.js",
+    "db:import:check": "NODE_EXTRA_CA_CERTS=./certs/supabase-prod-ca-2021.crt node scripts/import-postgres.js --check",
+    "db:import": "node scripts/import-postgres.js --import",
+    "activate": "node scripts/activate-postgres.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.9.1",
+    "express": "^4.21.2",
+    "nodemailer": "^10.1.0",
+    "pg": "^8.23.1"
+  },
+  "engines": {
+    "node": ">=22.13.0 <23"
+  }
+}
