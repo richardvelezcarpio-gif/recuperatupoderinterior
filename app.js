@@ -164,6 +164,8 @@ for (const page of ['test', 'mi-espacio', 'programa-7-dias']) {
     sendPage(res, `${page}.html`);
   });
 }
+// Public images only; never expose project files or credentials.
+app.use('/assets', express.static(path.join(root, 'assets'), {dotfiles: 'deny', index: false, fallthrough: false}));
 app.get('/admin.js', adminOnly, async (req, res) => {res.set('Cache-Control', 'no-store'); res.sendFile(path.join(root, 'admin.js'));});
 app.get(['/', '/index', '/index.html'], async (req, res) => sendPage(res, 'index.html'));
 app.get(['/acceso', '/acceso.html'], async (req, res) => sendPage(res, 'acceso.html'));
