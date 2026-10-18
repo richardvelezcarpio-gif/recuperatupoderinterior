@@ -10,3 +10,4 @@ data/
 # Copias locales de archivos
 *.backup*
 *.bak
+.vercel

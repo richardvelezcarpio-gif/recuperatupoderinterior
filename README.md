@@ -1,6 +1,6 @@
 # Recupera tu Poder Interior — V4
 
-Node.js 22 LTS, Express y SQLite. No utiliza Supabase.
+Node.js 22 LTS y Express, con PostgreSQL alojado en Supabase como backend actual. La aplicación utiliza `pg` y el esquema `rpi_private`; la autenticación y las sesiones son propias de la aplicación, no Supabase Auth. SQLite se conserva como almacenamiento heredado, respaldo y soporte de pruebas históricas e importación.
 
 ## Desarrollo local
 
@@ -12,6 +12,8 @@ cp .env.example .env # Solo la primera vez, si .env aún no existe.
 npm run dev
 ```
 
+Antes de iniciar, configura `DATABASE_URL` con una base de desarrollo independiente y conserva `APP_WRITES_ENABLED=false` hasta autorizar escrituras. No reutilices credenciales de producción para desarrollo o pruebas. El arranque no crea tablas ni ejecuta migraciones; la configuración administrativa puede consultar la base.
+
 Abre http://localhost:5173. El servidor local escucha únicamente en `127.0.0.1` por defecto. Mantén el mismo hostname al entrar e iniciar sesión: `localhost` y `127.0.0.1` no comparten cookies.
 
 En este Mac, Node 22 también está disponible mediante:
@@ -21,6 +23,8 @@ export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 ```
 
 ## Asignar la cuenta administradora
+
+Este procedimiento requiere autorización para escrituras y una base de desarrollo independiente.
 
 1. Registra tu cuenta desde http://localhost:5173/acceso.html si todavía no existe.
 2. En una terminal dentro del proyecto, ejecuta:
@@ -40,11 +44,11 @@ El ID debe coincidir con el correo normalizado de la cuenta existente. No se pro
 
 ## Sesiones y seguridad
 
-Las sesiones siguen en la tabla SQLite existente y duran siete días, también después de reiniciar el servidor. Se conserva el formato de contraseñas scrypt existente. La cookie es `HttpOnly`, `SameSite=Lax` y se marca `Secure` en producción (requiere HTTPS). No cambies `DATABASE_PATH` para reparar un acceso: la ruta predeterminada continúa siendo `data/usuarios.sqlite`.
+Las sesiones se guardan en PostgreSQL y duran siete días, también después de reiniciar el servidor. Se conserva el formato de contraseñas scrypt. La cookie es `HttpOnly`, `SameSite=Lax` y se marca `Secure` en producción (requiere HTTPS). `DATABASE_URL` selecciona el backend actual; `DATABASE_PATH` corresponde a herramientas y datos SQLite heredados y no cambia la conexión PostgreSQL.
 
 `/admin`, `/admin.html` y **todas** las API bajo `/api/admin` comprueban identidad y autorización en el servidor. Una sesión normal no implica permisos administrativos. La página de denegación permite iniciar sesión con otra cuenta y conserva el diseño oscuro y dorado.
 
-Solo se sirven archivos públicos enumerados explícitamente. No se publican la base SQLite, código del servidor, configuraciones, scripts ni dependencias.
+Se sirven las páginas y scripts públicos enumerados explícitamente y los recursos de `/assets/`. No se publican la base SQLite, código del servidor, configuraciones, scripts ni dependencias.
 
 ## Usuarios y exportación
 
@@ -52,14 +56,22 @@ El panel muestra nombre, correo, consentimiento y fecha de registro (UTC), en p�
 
 ## Pruebas
 
+La selección siguiente usa simulaciones y lecturas de código, sin conexiones PostgreSQL ni envíos SMTP reales:
+
 ```bash
-npm test
+node --test tests/emails.test.js tests/smtp.test.js tests/import-diagnostics.test.js
 ```
 
-Las pruebas usan bases temporales independientes. Verifican registro, login, compatibilidad con sesiones y contraseñas previas, asignación local, persistencia tras reinicio, permisos, variantes de rutas, archivos privados, datos del panel, CSV, cierre de sesión y cookies de producción. Nunca insertan ni borran usuarios de la base de desarrollo.
+Ejecuta con Node 22. No utilices `npm test` indiscriminadamente: incluye `tests/admin.test.js`, que usa `DATABASE_URL`, crea un esquema `rpi_test_*`, escribe datos ficticios y elimina el esquema al terminar. También consulta `rpi_private` y compara datos con un respaldo local. **Nunca ejecutar las pruebas administrativas contra producción**, aunque las escrituras previstas estén en un esquema de prueba.
+
+Antes de ejecutarlas, se necesita una base PostgreSQL completamente independiente, credenciales exclusivas y revisión de las dependencias de datos/respaldo del test. `APP_WRITES_ENABLED=false` no impide las escrituras SQL directas de los tests. Otras pruebas históricas crean y eliminan SQLite temporal. Consulta `POSTGRESQL.md`.
 
 ## Copias y despliegue
 
-Conserva `data/usuarios.sqlite` y sus archivos WAL mientras el servidor esté activo. Haz copias con la API de backup de SQLite o con el servidor detenido; no copies solo el archivo principal durante escrituras. La copia previa a esta corrección se encuentra en `data/backups/` y no se sirve por HTTP.
+Conserva los archivos SQLite heredados y `data/backups/`; no son el backend activo. No reemplaces PostgreSQL por una copia SQLite sin reconciliar los datos. Los respaldos actuales de PostgreSQL deben gestionarse y verificarse por separado. No subas bases, respaldos ni credenciales al repositorio.
 
-Antes de un despliegue público, prepara HTTPS, disco persistente, verificación de correo, recuperación de contraseña, controles CSRF/origen, límites de intentos persistentes y políticas de privacidad. Esta configuración está preparada para desarrollo local, no convierte por sí sola el proyecto en un servicio público listo para producción.
+El repositorio incluye la entrada serverless `api/index.js` y `vercel.json`, que empaqueta los recursos estáticos y certificados y dirige las solicitudes a Express. PostgreSQL externo proporciona la persistencia; no se depende del disco local de Vercel para guardar usuarios o sesiones. No se ejecutan migraciones al arrancar.
+
+Antes de una publicación, verifica en Vercel la rama, el directorio raíz, Node 22, `DATABASE_URL`, `APP_WRITES_ENABLED` y, cuando corresponda, `ADMIN_EMAIL`, `ADMIN_USER_ID`, `APP_URL` y las variables SMTP. No copies secretos a la documentación. La configuración del repositorio no certifica el estado del despliegue ni sus variables.
+
+Quedan por revisar para operación pública la recuperación de contraseña, verificación de correo, controles CSRF/origen, límites de intentos compartidos entre instancias y políticas de privacidad. Un push puede disparar un despliegue automático si la integración de Vercel está habilitada; requiere autorización previa.

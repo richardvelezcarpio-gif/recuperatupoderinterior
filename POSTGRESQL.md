@@ -1,29 +1,43 @@
-# Estado de integración PostgreSQL
+# PostgreSQL: estado actual y antecedentes
 
-El backend activo preparado usa pg y rpi_private, con consultas parametrizadas y TLS validado mediante la CA oficial en certs/. Los hashes scrypt, sesiones y calendario no cambian. No se crean tablas al arrancar. better-sqlite3 se conserva exclusivamente para respaldo, importación y pruebas históricas aisladas; server.js/app.js/database.js no lo importan.
+## Backend actual
 
-APP_WRITES_ENABLED=false en .env mantiene bloqueadas las mutaciones HTTP (503). No se modifican las variables ADMIN ni SMTP. DATABASE_URL es privada, ya configurada y excluida de Git. La CA se carga explícitamente en el cliente pg para que funcione aunque Node ya haya arrancado. No se desactiva rejectUnauthorized.
+La aplicación utiliza PostgreSQL alojado en Supabase, mediante `pg`, con el esquema `rpi_private` y las tablas `users`, `sessions`, `program_starts` y `program_answers`. Conserva la autenticación propia, los hashes scrypt, las sesiones y el calendario del programa. No utiliza Supabase Auth.
 
-## Activación futura (NO ejecutada)
+Las consultas son parametrizadas. El cliente verifica TLS mediante la CA pública de `certs/supabase-prod-ca-2021.crt`; no se debe desactivar `rejectUnauthorized`. `DATABASE_URL` es privada y debe configurarse por entorno. No se crean tablas ni se ejecutan migraciones al arrancar.
 
-En la carpeta del proyecto:
+`better-sqlite3` se conserva para herramientas de importación, respaldo y pruebas históricas. `server.js`, `app.js` y `database.js` no lo utilizan como backend. Los archivos SQLite y sus respaldos deben conservarse.
+
+## Entornos y escrituras
+
+`APP_WRITES_ENABLED=false` bloquea las mutaciones HTTP de la aplicación con respuesta 503. No bloquea consultas de lectura al arrancar ni escrituras SQL directas de herramientas o pruebas. No representa un permiso de solo lectura de PostgreSQL.
+
+Desarrollo y pruebas deben usar una base completamente independiente de producción, con credenciales propias. No basta con cambiar el nombre del esquema dentro de la base de producción. Antes de habilitar escrituras, comprobar el destino y autorizar la operación.
+
+El repositorio contiene `api/index.js` y `vercel.json` para Vercel. Esto describe el código disponible, no confirma qué commit, variables o versión Node están ejecutándose en producción. Esa verificación debe hacerse por separado, sin revelar secretos. El limitador en memoria no se comparte entre instancias; revisar límites compartidos y el proxy HTTPS antes de escalar.
+
+## Pruebas seguras seleccionadas
+
+Con Node 22, esta selección utiliza simulaciones, sin PostgreSQL ni correo real:
 
 ```sh
-PATH=/opt/homebrew/opt/node@22/bin:$PATH npm run activate
+node --test tests/emails.test.js tests/smtp.test.js tests/import-diagnostics.test.js
 ```
 
-El comando comprueba PostgreSQL/administrador antes de iniciar. Si el puerto está ocupado, únicamente termina un servidor suspendido y su supervisor suspendido cuyo directorio sea exactamente este proyecto. Nunca reanuda el proceso antiguo SQLite. Si encuentra otro proceso, aborta. Después inicia el supervisor Node con APP_WRITES_ENABLED=true solo para ese proceso. No edita SQLite ni .env y no cambia DNS ni despliega. No ejecutar antes de autorizar escrituras.
+## Pruebas administrativas: nunca contra producción
 
-Para una futura revisión sin escrituras: npm run dev (respeta APP_WRITES_ENABLED=false); requiere primero liberar el puerto antiguo de forma controlada. No lanzar ambos comandos simultáneamente. Para detener el nuevo supervisor, Ctrl+C; .env conserva false.
+`npm test` incluye `tests/admin.test.js`. Este test usa `DATABASE_URL`, crea un esquema `rpi_test_*`, inserta y modifica datos ficticios y elimina el esquema al finalizar. También consulta tablas de `rpi_private` y compara datos con un respaldo local. Sus supuestos históricos deben revisarse antes de ejecutarlo en un entorno nuevo.
 
-## Pruebas
+**Nunca ejecutar esta prueba contra producción.** El esquema temporal no convierte la base en un entorno aislado. Se requiere una base PostgreSQL de pruebas independiente, un usuario exclusivo, datos ficticios y un respaldo/fixture compatible; revisar estos requisitos antes de autorizar la ejecución. `APP_WRITES_ENABLED=false` no protege frente al SQL directo de los tests.
 
-Con Node 22: npm test. tests/admin.test.js crea un esquema rpi_test_<aleatorio> con datos exclusivamente ficticios y lo elimina al terminar; requiere DATABASE_URL y permiso de crear ese esquema. Nunca escribe en rpi_private. Compara los ocho registros reales con el respaldo autorizado. Comprueba registro/login, sesiones persistentes entre instancias, roles, CSV consentido, desbloqueo, edición, eliminación sintética, rollback y mantenimiento. Las demás pruebas de programa usan SQLite temporal, nunca el archivo real.
+Las pruebas históricas de programa e importación pueden crear y eliminar archivos SQLite temporales. No forman parte de la selección anterior. No ejecutar migraciones ni scripts de importación o activación como parte de una comprobación rutinaria.
 
-Las pruebas de navegador usan esquemas sintéticos y Chrome instalado; no añaden dependencias. La aplicación permanece suspendida hasta autorización.
+## Información histórica
 
-## Recuperación
+Las notas anteriores describían una transición local con el servidor suspendido, ocho registros usados para comparación y una activación todavía no ejecutada. Esos detalles no certifican el estado actual de los procesos, los datos o el despliegue. La antigua afirmación «No se ha desplegado en Vercel» no debe usarse como diagnóstico actual.
 
-Ante fallo de activación no reanudar el antiguo proceso SQLite. Mantener APP_WRITES_ENABLED=false y revisar errores seguros. Después de habilitar escrituras en PostgreSQL, no volver al respaldo SQLite sin reconciliar las nuevas altas, sesiones y respuestas. SQLite y data/backups se conservan como respaldo intacto.
+`scripts/activate-postgres.js` es una herramienta de esa transición: consulta PostgreSQL y la configuración administrativa, puede terminar procesos suspendidos del proyecto y arranca un supervisor con escrituras habilitadas. No es un paso obligatorio de desarrollo ni de despliegue. No ejecutarlo sin una revisión y autorización específica.
 
-El limitador en memoria es adecuado al único servidor local actual; antes de escalar a varias instancias se necesitará un limitador compartido y revisar el proxy HTTPS. No se ha desplegado en Vercel.
+## Recuperación y conservación
+
+Conservar SQLite, `data/backups/` y los respaldos de consolidación y sincronización. Después de registrar datos en PostgreSQL, no volver al respaldo SQLite sin reconciliación. Los respaldos de PostgreSQL deben verificarse de forma independiente. No publicar `.env`, bases de datos, volcados, respaldos ni credenciales. No confundir el certificado público de CA con una clave privada.
