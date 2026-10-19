@@ -2,7 +2,7 @@ import express from 'express';
 import {mountProgram} from './program.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import {root, normalizeEmail, adminConfig} from './config.js';
+import {root, normalizeEmail, adminConfig, allowedOriginsConfig} from './config.js';
 
 // Express 4: propagar errores de handlers asíncronos al middleware seguro.
 export function asyncRoutes(app) {
@@ -13,7 +13,7 @@ export function asyncRoutes(app) {
   }
   return app;
 }
-export async function createApp({db, now=Date.now, writesEnabled=false, adminEnv=process.env}) {
+export async function createApp({db, now=Date.now, writesEnabled=false, adminEnv=process.env, originEnv=process.env}) {
 const admin = await adminConfig(db,adminEnv);
 const app = asyncRoutes(express());
 app.use((req,res,next)=>{
@@ -112,7 +112,7 @@ app.post('/api/logout', async (req, res) => {
   res.clearCookie(cookieName, {path: '/', httpOnly: true, sameSite: 'lax', secure});
   res.json({ok: true});
 });
-mountProgram(app, {db, getUser, now});
+mountProgram(app, {db, getUser, now, allowedOrigins: allowedOriginsConfig(originEnv)});
 
 // La identidad se asigna localmente, nunca desde el registro o una API pública.
 async function isAdmin(req) {

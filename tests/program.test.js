@@ -20,12 +20,12 @@ test('Desbloqueo seguro de siete días con reloj del servidor inyectado', async 
   let time=base, server, url;
   async function launch() {
     prepareProgramFixture(db);const app=asyncRoutes(express()); app.use(express.json());
-    // Identidades de prueba; en producción se inyecta getUser, con la sesión SQLite real.
-    mountProgram(app,{db,now:()=>time,getUser:req=>req.headers.authorization==='fixture-a'?{id:1}:req.headers.authorization==='fixture-b'?{id:2}:null});
+    // Identidades de prueba; en producción se inyecta getUser, con la sesión real de la aplicación.
+    mountProgram(app,{allowedOrigins:new Set(['https://program.example']),db,now:()=>time,getUser:req=>req.headers.authorization==='fixture-a'?{id:1}:req.headers.authorization==='fixture-b'?{id:2}:null});
     server=app.listen(0,'127.0.0.1');await once(server,'listening');url=`http://127.0.0.1:${server.address().port}`;
   }
   async function stop(){await new Promise(resolve=>server.close(resolve));}
-  const get=(endpoint,who='fixture-a',opts={})=>fetch(url+endpoint,{...opts,headers:{...(who?{Authorization:who}:{}),...opts.headers}});
+  const get=(endpoint,who='fixture-a',opts={})=>fetch(url+endpoint,{...opts,headers:{Origin:'https://program.example',...(who?{Authorization:who}:{}),...opts.headers}});
   const start=(who='fixture-a',body={})=>get('/api/program/start',who,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const status=async who=>(await get('/api/program/status',who)).json();
   t.after(async()=>{await stop();db.close();fs.rmSync(directory,{recursive:true,force:true});});

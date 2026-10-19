@@ -14,9 +14,9 @@ test('Respuestas privadas, edición, completado y eliminación persistentes',asy
  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'rpi-answers-'));const file=path.join(directory,'test.sqlite');
  let db=new Database(file);db.pragma('foreign_keys=ON');db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY); INSERT INTO users VALUES(1),(2);');
  let server,url,time=Date.UTC(2026,0,1);const initial=time;
- async function launch(){prepareProgramFixture(db);const app=asyncRoutes(express());app.use(express.json({limit:'12kb'}));mountProgram(app,{db,now:()=>time,getUser:req=>req.headers.authorization==='a'?{id:1}:req.headers.authorization==='b'?{id:2}:null});app.use((error,req,res,next)=>res.status(error.status||500).json({error:'Solicitud inválida.'}));server=app.listen(0,'127.0.0.1');await once(server,'listening');url=`http://127.0.0.1:${server.address().port}`;}
+ async function launch(){prepareProgramFixture(db);const app=asyncRoutes(express());app.use(express.json({limit:'12kb'}));mountProgram(app,{allowedOrigins:new Set(['https://program.example']),db,now:()=>time,getUser:req=>req.headers.authorization==='a'?{id:1}:req.headers.authorization==='b'?{id:2}:null});app.use((error,req,res,next)=>res.status(error.status||500).json({error:'Solicitud inválida.'}));server=app.listen(0,'127.0.0.1');await once(server,'listening');url=`http://127.0.0.1:${server.address().port}`;}
  async function stop(){await new Promise(resolve=>server.close(resolve));}
- const call=(endpoint,user='a',method='GET',body,extra={})=>fetch(url+endpoint,{method,headers:{...(user?{Authorization:user}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...extra},...(body!==undefined?{body:JSON.stringify(body)}:{})});
+ const call=(endpoint,user='a',method='GET',body,extra={})=>fetch(url+endpoint,{method,headers:{Origin:'https://program.example',...(user?{Authorization:user}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{}),...extra},...(body!==undefined?{body:JSON.stringify(body)}:{})});
  const read=async user=>(await (await call('/api/program/days/1',user)).json()).answers;
  const payload={reflection:'Reflexión privada A',questions:['Una','Dos','Tres'],exercise:'<script>alert("no ejecutar")</script>'};
  t.after(async()=>{await stop();db.close();fs.rmSync(directory,{recursive:true,force:true});});await launch();

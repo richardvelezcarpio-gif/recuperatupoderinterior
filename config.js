@@ -22,3 +22,21 @@ export async function adminConfig(db, env=process.env) {
   }
   return {email, id};
 }
+
+// Canonical origins only: never derive authorization from request/proxy headers.
+export function allowedOriginsConfig(env=process.env) {
+  const denied = new Set();
+  if (typeof env.ALLOWED_ORIGINS !== 'string' || !env.ALLOWED_ORIGINS.trim()) return denied;
+  const origins = env.ALLOWED_ORIGINS.split(',').map(value => value.trim());
+  for (const origin of origins) {
+    let url;
+    try { url = new URL(origin); } catch { return denied; }
+    if (url.origin !== origin || origin.includes('*') || url.username || url.password) return denied;
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    const development = env.NODE_ENV === 'development' && !env.VERCEL;
+    if (loopback) {
+      if (!development || !url.port || !['http:', 'https:'].includes(url.protocol)) return denied;
+    } else if (url.protocol !== 'https:') return denied;
+  }
+  return new Set(origins);
+}

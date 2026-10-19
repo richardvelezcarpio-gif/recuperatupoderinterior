@@ -75,3 +75,21 @@ El repositorio incluye la entrada serverless `api/index.js` y `vercel.json`, que
 Antes de una publicación, verifica en Vercel la rama, el directorio raíz, Node 22, `DATABASE_URL`, `APP_WRITES_ENABLED` y, cuando corresponda, `ADMIN_EMAIL`, `ADMIN_USER_ID`, `APP_URL` y las variables SMTP. No copies secretos a la documentación. La configuración del repositorio no certifica el estado del despliegue ni sus variables.
 
 Quedan por revisar para operación pública la recuperación de contraseña, verificación de correo, controles CSRF/origen, límites de intentos compartidos entre instancias y políticas de privacidad. Un push puede disparar un despliegue automático si la integración de Vercel está habilitada; requiere autorización previa.
+
+## Orígenes autorizados del programa
+
+`ALLOWED_ORIGINS` es una lista separada por comas de orígenes exactos aprobados para el entorno. Cada entrada contiene esquema y autoridad (dominio y puerto, si corresponde), sin ruta, barra final, credenciales, parámetros, fragmentos ni comodines. Se exige el formato canónico de `URL.origin`; no se normalizan encabezados recibidos para ampliar permisos.
+
+En producción y Preview se admiten únicamente orígenes HTTPS no locales. Solo con `NODE_ENV=development` y fuera de Vercel se permiten `localhost`, `127.0.0.1` o `[::1]`, siempre con puerto explícito no predeterminado. No hay orígenes autorizados por defecto: una lista ausente o con cualquier entrada inválida bloquea las escrituras del programa con 403 para usuarios autenticados. Las lecturas y las reglas de autenticación no cambian. `APP_WRITES_ENABLED=false` sigue bloqueando las mutaciones con 503.
+
+Antes de publicar, configurar `ALLOWED_ORIGINS` en Vercel usando exclusivamente los orígenes HTTPS verificados del proyecto, asignando por separado Production y Preview. Incluir solo los dominios que realmente servirán el formulario; aprobar cada dominio Preview expresamente, sin autorizar todos los subdominios de Vercel. No copiar valores de Host ni X-Forwarded-* a esta lista. Esta documentación no establece ni modifica valores de Vercel; requiere autorización antes de aplicar configuración o desplegar.
+
+Las escrituras exigen un único encabezado Origin autorizado, JSON y ausencia de Fetch Metadata cross-site. Los encabezados Host y X-Forwarded-* no conceden autorización. Este control protege el contexto de navegador; no sustituye las sesiones y los permisos frente a clientes que pueden falsificar encabezados.
+
+Prueba aislada, sin PostgreSQL: `node --test tests/origin.test.js`. Usa solicitudes locales y una base simulada; no ejecutar `npm test` completo contra una base real.
+
+## Batería local previa a publicación
+
+Con Node 22, ejecutar `npm run test:safe`. La lista explícita excluye `tests/admin.test.js` y no importa el cliente PostgreSQL. Comprueba Origin, rutas, recursos, registro/login, cookies, permisos, privacidad, guardado y desbloqueo. Usa identidades ficticias, SQLite en memoria para la aplicación integrada y archivos SQLite temporales propios para comprobar persistencia del programa; estos últimos se eliminan al terminar. No usa la base real ni envía correo.
+
+Esta batería no sustituye la validación del despliegue real. Antes de publicar se deben confirmar dominio canónico, Node 22, rama, directorio raíz, configuración de Production y Preview, `ALLOWED_ORIGINS` y `APP_WRITES_ENABLED`. No ejecutar pruebas de escritura en Preview si comparte la base de producción. Conservar `DATABASE_URL` y las credenciales existentes.

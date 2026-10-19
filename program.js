@@ -87,7 +87,7 @@ const content = [
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 // El reloj solo se inyecta desde código en las pruebas, nunca mediante peticiones.
-export function mountProgram(app, {db, getUser, now = Date.now}) {
+export function mountProgram(app, {db, getUser, now = Date.now, allowedOrigins = new Set()}) {
   const answerRow = db.prepare('SELECT reflection,questions,exercise,completed,updated_at FROM program_answers WHERE user_id=? AND day=?');
   const saveAnswers = db.prepare(`INSERT INTO program_answers(user_id,day,reflection,questions,exercise,completed,updated_at) VALUES(?,?,?,?,?,?,?)
     ON CONFLICT(user_id,day) DO UPDATE SET reflection=excluded.reflection,questions=excluded.questions,exercise=excluded.exercise,
@@ -118,7 +118,8 @@ export function mountProgram(app, {db, getUser, now = Date.now}) {
     if (!user) return res.status(401).json({error: 'Inicia sesión para acceder al programa.'});
     if (['POST','PUT','DELETE'].includes(req.method) &&
         (!req.is('application/json') || req.get('Sec-Fetch-Site') === 'cross-site' ||
-         (req.get('Origin') && req.get('Origin') !== `${req.protocol}://${req.get('Host')}`))) {
+         !allowedOrigins.has(req.get('Origin')) ||
+         req.rawHeaders.filter((value, index) => index % 2 === 0 && value.toLowerCase() === 'origin').length !== 1)) {
       return res.status(403).json({error:'Realiza esta acción desde la página del programa.'});
     }
     req.programUserId = user.id;
