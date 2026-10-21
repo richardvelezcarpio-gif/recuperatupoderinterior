@@ -17,7 +17,8 @@
           "assets/**",
           "*.png",
           "*.ico",
-          "*.webp"
+          "*.webp",
+          "mi-diario.js"
         ]
       }
     }

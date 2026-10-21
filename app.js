@@ -1,4 +1,5 @@
 import express from 'express';
+import {mountDiary} from './diary.js';
 import {mountProgram} from './program.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -113,6 +114,7 @@ app.post('/api/logout', async (req, res) => {
   res.json({ok: true});
 });
 mountProgram(app, {db, getUser, now, allowedOrigins: allowedOriginsConfig(originEnv)});
+mountDiary(app, {db, getUser, now, allowedOrigins: allowedOriginsConfig(originEnv)});
 
 // La identidad se asigna localmente, nunca desde el registro o una API pública.
 async function isAdmin(req) {
@@ -156,7 +158,7 @@ app.get(['/admin', '/admin.html'], async (req, res) => {
   if (!await isAdmin(req)) return sendPage(res, 'acceso-denegado.html', 403);
   sendPage(res, 'admin.html');
 });
-for (const page of ['test', 'mi-espacio', 'programa-7-dias']) {
+for (const page of ['test', 'mi-espacio', 'programa-7-dias', 'mi-diario']) {
   app.get([`/${page}`, `/${page}.html`], async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const day = page === 'programa-7-dias' && typeof req.query.dia === 'string' && /^[1-7]$/.test(req.query.dia) ? `?dia=${req.query.dia}` : '';
@@ -170,6 +172,7 @@ app.use('/assets', (error, req, res, next) => {
   if (error.status === 404) return res.status(404).send('Archivo no encontrado.');
   next(error);
 });
+app.get('/mi-diario.js', async (req,res) => { if (!await getUser(req)) return res.status(401).end(); res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}); res.sendFile(path.join(root,'mi-diario.js')); });
 app.get('/admin.js', adminOnly, async (req, res) => {res.set('Cache-Control', 'no-store'); res.sendFile(path.join(root, 'admin.js'));});
 app.get(['/', '/index', '/index.html'], async (req, res) => sendPage(res, 'index.html'));
 app.get(['/acceso', '/acceso.html'], async (req, res) => sendPage(res, 'acceso.html'));

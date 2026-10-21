@@ -13,7 +13,7 @@ export function createDatabase({env=process.env,schema='rpi_private'}={}) {
   function wrap(executor) {
     function prepare(sql) {
       let n=0;
-      sql=sql.replace(/\?/g,()=>'$'+(++n)).replace(/\b(FROM|JOIN|INTO|UPDATE)\s+(users|sessions|program_starts|program_answers)\b/gi,(_,verb,table)=>`${verb} ${schema}.${table}`);
+      sql=sql.replace(/\?/g,()=>'$'+(++n)).replace(/\b(FROM|JOIN|INTO|UPDATE)\s+(users|sessions|program_starts|program_answers|diary_entries)\b/gi,(_,verb,table)=>`${verb} ${schema}.${table}`);
       const query=async args=>{
         const result=await executor.query(sql,args);
         // Solo BIGINT: pg lo entrega como texto. No convertir campos de texto numérico.
